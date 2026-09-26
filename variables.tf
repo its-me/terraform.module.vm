@@ -27,11 +27,11 @@ variable "machine_type" {
 variable "boot_disk_image" {
   description = "Boot disk image or image family (project/family)."
   type        = string
-  default     = "debian-cloud/debian-12"
+  default     = "debian-cloud/debian-13"
 }
 
 variable "boot_disk_size_gb" {
-  description = "Boot disk size in GB. 10 is the minimum for the default Debian image."
+  description = "Boot disk size in GB. 10 is the minimum for the default Debian 13 image."
   type        = number
   default     = 10
 }
