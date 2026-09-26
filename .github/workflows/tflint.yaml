@@ -1,0 +1,19 @@
+name: tflint
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tflint:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/its-me/tflint:latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: tflint --recursive
