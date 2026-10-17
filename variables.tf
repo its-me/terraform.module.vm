@@ -43,7 +43,19 @@ variable "boot_disk_type" {
 }
 
 variable "assign_external_ip" {
-  description = "Whether to give the instance an ephemeral public IPv4 address. Without one (and without Cloud NAT on the network), the instance has no outbound internet access."
+  description = "Whether to give the instance an ephemeral public IPv4 address, which changes on stop/start. Without a public IP (and without Cloud NAT on the network), the instance has no outbound internet access. Ignored when static_external_ip = true."
+  type        = bool
+  default     = false
+}
+
+variable "static_external_ip" {
+  description = "Whether to reserve a static public IPv4 address for the instance, so DNS can point straight at it without a load balancer. Takes precedence over assign_external_ip."
+  type        = bool
+  default     = false
+}
+
+variable "allow_http_https" {
+  description = "Whether to create a firewall rule opening TCP 80 and 443 to the internet. Only useful with a public IP; TLS is terminated on the instance itself."
   type        = bool
   default     = false
 }

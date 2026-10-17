@@ -1,5 +1,6 @@
 locals {
   network_tag = var.name
+  region      = join("-", slice(split("-", var.zone), 0, 2))
 }
 
 # Dedicated service account instead of the default compute SA, which has project Editor.
@@ -18,6 +19,15 @@ resource "google_project_iam_member" "this" {
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.this.email}"
+}
+
+resource "google_compute_address" "this" {
+  count = var.static_external_ip ? 1 : 0
+
+  name    = "${var.name}-ip"
+  project = var.project_id
+  region  = local.region
+  labels  = var.labels
 }
 
 data "google_compute_subnetwork" "this" {
@@ -46,8 +56,10 @@ resource "google_compute_instance" "this" {
     subnetwork = var.subnet_id
 
     dynamic "access_config" {
-      for_each = var.assign_external_ip ? [1] : []
-      content {}
+      for_each = var.static_external_ip || var.assign_external_ip ? [1] : []
+      content {
+        nat_ip = one(google_compute_address.this[*].address)
+      }
     }
   }
 
@@ -80,5 +92,21 @@ resource "google_compute_firewall" "iap_ssh" {
   allow {
     protocol = "tcp"
     ports    = ["22"]
+  }
+}
+
+resource "google_compute_firewall" "http_https" {
+  count = var.allow_http_https ? 1 : 0
+
+  name          = "${var.name}-allow-http-https"
+  project       = var.project_id
+  network       = data.google_compute_subnetwork.this.network
+  direction     = "INGRESS"
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = [local.network_tag]
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
   }
 }

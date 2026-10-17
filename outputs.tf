@@ -14,7 +14,7 @@ output "internal_ip" {
 }
 
 output "external_ip" {
-  description = "Ephemeral public IPv4 address, or null if assign_external_ip = false."
+  description = "Public IPv4 address (static or ephemeral), or null if the instance has none."
   value       = try(google_compute_instance.this.network_interface[0].access_config[0].nat_ip, null)
 }
 
