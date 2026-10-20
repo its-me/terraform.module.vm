@@ -1,6 +1,20 @@
 locals {
-  network_tag = var.name
-  region      = join("-", slice(split("-", var.zone), 0, 2))
+  network_tag  = var.name
+  region       = join("-", slice(split("-", var.zone), 0, 2))
+  subnet_parts = regex("projects/([^/]+)/regions/([^/]+)/subnetworks/([^/]+)$", var.subnet_id)
+
+  # Identity-Aware Proxy's TCP forwarding range, for `gcloud compute ssh --tunnel-through-iap`.
+  iap_range         = "35.235.240.0/20"
+  ssh_source_ranges = concat(var.allow_iap_ssh ? [local.iap_range] : [], var.ssh_source_ranges)
+
+  firewall_rules = merge(
+    length(local.ssh_source_ranges) > 0 ? {
+      ssh = { ports = ["22"], source_ranges = local.ssh_source_ranges }
+    } : {},
+    var.allow_http_https ? {
+      http-https = { ports = ["80", "443"], source_ranges = ["0.0.0.0/0"] }
+    } : {},
+  )
 }
 
 # Dedicated service account instead of the default compute SA, which has project Editor.
@@ -30,8 +44,12 @@ resource "google_compute_address" "this" {
   labels  = var.labels
 }
 
+# subnet_id may be an ID (projects/P/regions/R/subnetworks/N) or a self link, so
+# look the subnet up by its parts rather than by self_link, which rejects IDs.
 data "google_compute_subnetwork" "this" {
-  self_link = var.subnet_id
+  project = local.subnet_parts[0]
+  region  = local.subnet_parts[1]
+  name    = local.subnet_parts[2]
 }
 
 resource "google_compute_instance" "this" {
@@ -79,34 +97,18 @@ resource "google_compute_instance" "this" {
   }
 }
 
-resource "google_compute_firewall" "iap_ssh" {
-  count = var.allow_iap_ssh ? 1 : 0
+resource "google_compute_firewall" "this" {
+  for_each = local.firewall_rules
 
-  name          = "${var.name}-allow-iap-ssh"
+  name          = "${var.name}-allow-${each.key}"
   project       = var.project_id
   network       = data.google_compute_subnetwork.this.network
   direction     = "INGRESS"
-  source_ranges = ["35.235.240.0/20"]
+  source_ranges = each.value.source_ranges
   target_tags   = [local.network_tag]
 
   allow {
     protocol = "tcp"
-    ports    = ["22"]
-  }
-}
-
-resource "google_compute_firewall" "http_https" {
-  count = var.allow_http_https ? 1 : 0
-
-  name          = "${var.name}-allow-http-https"
-  project       = var.project_id
-  network       = data.google_compute_subnetwork.this.network
-  direction     = "INGRESS"
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = [local.network_tag]
-
-  allow {
-    protocol = "tcp"
-    ports    = ["80", "443"]
+    ports    = each.value.ports
   }
 }

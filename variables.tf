@@ -66,6 +66,12 @@ variable "allow_iap_ssh" {
   default     = true
 }
 
+variable "ssh_source_ranges" {
+  description = "IPv4 CIDR ranges allowed to SSH (TCP 22) straight to the instance's public IP, e.g. [\"0.0.0.0/0\"] for anywhere or [\"203.0.113.4/32\"] for one address. Empty (the default) creates no rule. Only useful with a public IP; logins still go through OS Login."
+  type        = list(string)
+  default     = []
+}
+
 variable "deletion_protection" {
   description = "Whether to block deletion of the instance."
   type        = bool
