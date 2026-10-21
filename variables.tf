@@ -67,9 +67,25 @@ variable "allow_iap_ssh" {
 }
 
 variable "ssh_source_ranges" {
-  description = "IPv4 CIDR ranges allowed to SSH (TCP 22) straight to the instance's public IP, e.g. [\"0.0.0.0/0\"] for anywhere or [\"203.0.113.4/32\"] for one address. Empty (the default) creates no rule. Only useful with a public IP; logins still go through OS Login."
+  description = "IPv4 CIDR ranges allowed to SSH (TCP 22) straight to the instance's public IP, e.g. [\"0.0.0.0/0\"] for anywhere or [\"203.0.113.4/32\"] for one address. Empty (the default) creates no rule. Only useful with a public IP."
   type        = list(string)
   default     = []
+}
+
+variable "ssh_keys" {
+  description = "Map of Linux username -> SSH public key (e.g. \"ssh-ed25519 AAAA... me@laptop\") to install on the instance. Setting any turns OS Login off and blocks project-wide metadata keys, so only these keys (and IAP-tunnelled logins using them) work; each user is created with sudo by the guest agent. Empty (the default) keeps OS Login, where access follows IAM roles instead."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for user in keys(var.ssh_keys) : can(regex("^[a-z_][a-z0-9_-]{0,31}$", user))])
+    error_message = "ssh_keys usernames must be valid Linux usernames: lowercase letters, digits, '_' or '-', starting with a letter or '_', at most 32 characters."
+  }
+
+  validation {
+    condition     = alltrue([for key in values(var.ssh_keys) : can(regex("^(ssh-|ecdsa-|sk-)[^ ]+ [A-Za-z0-9+/=]+", key))])
+    error_message = "ssh_keys values must be OpenSSH public keys, e.g. \"ssh-ed25519 AAAA... comment\"."
+  }
 }
 
 variable "deletion_protection" {

@@ -92,7 +92,11 @@ resource "google_compute_instance" "this" {
     enable_integrity_monitoring = true
   }
 
-  metadata = {
+  metadata = length(var.ssh_keys) > 0 ? {
+    enable-oslogin         = "FALSE"
+    block-project-ssh-keys = "TRUE"
+    ssh-keys               = join("\n", [for user, key in var.ssh_keys : "${user}:${trimspace(key)}"])
+    } : {
     enable-oslogin = "TRUE"
   }
 }
