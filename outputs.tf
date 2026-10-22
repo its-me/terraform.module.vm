@@ -18,6 +18,11 @@ output "external_ip" {
   value       = try(google_compute_instance.this.network_interface[0].access_config[0].nat_ip, null)
 }
 
+output "external_ipv6" {
+  description = "Public IPv6 address (static or ephemeral), or null if the instance has none."
+  value       = try(google_compute_instance.this.network_interface[0].ipv6_access_config[0].external_ipv6, null)
+}
+
 output "service_account_email" {
   description = "Email of the instance's dedicated service account."
   value       = google_service_account.this.email

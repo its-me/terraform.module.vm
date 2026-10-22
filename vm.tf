@@ -7,12 +7,25 @@ locals {
   iap_range         = "35.235.240.0/20"
   ssh_source_ranges = concat(var.allow_iap_ssh ? [local.iap_range] : [], var.ssh_source_ranges)
 
+  external_ipv4 = var.static_external_ip || var.assign_external_ip
+  external_ipv6 = var.external_ipv6 && local.external_ipv4
+
+  # A firewall rule can't mix IPv4 and IPv6 source ranges, so each gets its own rule.
+  ssh_ipv4_ranges = [for r in local.ssh_source_ranges : r if !strcontains(r, ":")]
+  ssh_ipv6_ranges = [for r in local.ssh_source_ranges : r if strcontains(r, ":")]
+
   firewall_rules = merge(
-    length(local.ssh_source_ranges) > 0 ? {
-      ssh = { ports = ["22"], source_ranges = local.ssh_source_ranges }
+    length(local.ssh_ipv4_ranges) > 0 ? {
+      ssh = { ports = ["22"], source_ranges = local.ssh_ipv4_ranges }
+    } : {},
+    length(local.ssh_ipv6_ranges) > 0 ? {
+      ssh-ipv6 = { ports = ["22"], source_ranges = local.ssh_ipv6_ranges }
     } : {},
     var.allow_http_https ? {
       http-https = { ports = ["80", "443"], source_ranges = ["0.0.0.0/0"] }
+    } : {},
+    var.allow_http_https && local.external_ipv6 ? {
+      http-https-ipv6 = { ports = ["80", "443"], source_ranges = ["::/0"] }
     } : {},
   )
 }
@@ -44,6 +57,19 @@ resource "google_compute_address" "this" {
   labels  = var.labels
 }
 
+resource "google_compute_address" "ipv6" {
+  count = var.static_external_ip && local.external_ipv6 ? 1 : 0
+
+  name               = "${var.name}-ipv6"
+  project            = var.project_id
+  region             = local.region
+  address_type       = "EXTERNAL"
+  ip_version         = "IPV6"
+  ipv6_endpoint_type = "VM"
+  subnetwork         = var.subnet_id
+  labels             = var.labels
+}
+
 # subnet_id may be an ID (projects/P/regions/R/subnetworks/N) or a self link, so
 # look the subnet up by its parts rather than by self_link, which rejects IDs.
 data "google_compute_subnetwork" "this" {
@@ -72,11 +98,22 @@ resource "google_compute_instance" "this" {
 
   network_interface {
     subnetwork = var.subnet_id
+    stack_type = local.external_ipv6 ? "IPV4_IPV6" : "IPV4_ONLY"
 
     dynamic "access_config" {
-      for_each = var.static_external_ip || var.assign_external_ip ? [1] : []
+      for_each = local.external_ipv4 ? [1] : []
       content {
         nat_ip = one(google_compute_address.this[*].address)
+      }
+    }
+
+    dynamic "ipv6_access_config" {
+      for_each = local.external_ipv6 ? [1] : []
+      content {
+        network_tier  = "PREMIUM"
+        external_ipv6 = one(google_compute_address.ipv6[*].address)
+        # external_ipv6_prefix_length is left to GCP's default (/96): setting it
+        # forces the instance to be replaced when IPv6 is added to an existing VM.
       }
     }
   }

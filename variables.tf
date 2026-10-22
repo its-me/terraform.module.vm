@@ -54,6 +54,12 @@ variable "static_external_ip" {
   default     = false
 }
 
+variable "external_ipv6" {
+  description = "Whether a VM with a public IPv4 (static_external_ip or assign_external_ip) also gets a public IPv6 address, static when static_external_ip = true. Requires a dual-stack subnet with external IPv6 (terraform.module.network's external_ipv6). allow_http_https then opens 80/443 to ::/0 as well."
+  type        = bool
+  default     = true
+}
+
 variable "allow_http_https" {
   description = "Whether to create a firewall rule opening TCP 80 and 443 to the internet. Only useful with a public IP; TLS is terminated on the instance itself."
   type        = bool
@@ -67,7 +73,7 @@ variable "allow_iap_ssh" {
 }
 
 variable "ssh_source_ranges" {
-  description = "IPv4 CIDR ranges allowed to SSH (TCP 22) straight to the instance's public IP, e.g. [\"0.0.0.0/0\"] for anywhere or [\"203.0.113.4/32\"] for one address. Empty (the default) creates no rule. Only useful with a public IP."
+  description = "IPv4 CIDR ranges allowed to SSH (TCP 22) straight to the instance's public IP, e.g. [\"0.0.0.0/0\"] for anywhere or [\"203.0.113.4/32\"] for one address. IPv6 ranges (e.g. [\"::/0\"]) are allowed too and get their own rule. Empty (the default) creates no rule. Only useful with a public IP."
   type        = list(string)
   default     = []
 }
