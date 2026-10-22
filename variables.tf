@@ -66,6 +66,12 @@ variable "allow_http_https" {
   default     = false
 }
 
+variable "allow_icmp" {
+  description = "Whether to create firewall rules allowing ICMP (ping) from the internet, over IPv4 and, when the instance has a public IPv6, ICMPv6. Only useful with a public IP."
+  type        = bool
+  default     = false
+}
+
 variable "allow_iap_ssh" {
   description = "Whether to create a firewall rule allowing SSH from Identity-Aware Proxy's range, so the instance is reachable via `gcloud compute ssh --tunnel-through-iap` without a public IP."
   type        = bool

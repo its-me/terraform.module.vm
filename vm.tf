@@ -14,18 +14,25 @@ locals {
   ssh_ipv4_ranges = [for r in local.ssh_source_ranges : r if !strcontains(r, ":")]
   ssh_ipv6_ranges = [for r in local.ssh_source_ranges : r if strcontains(r, ":")]
 
+  # ICMPv6 has no protocol name in GCP firewall rules, only its IP protocol number (58).
   firewall_rules = merge(
     length(local.ssh_ipv4_ranges) > 0 ? {
-      ssh = { ports = ["22"], source_ranges = local.ssh_ipv4_ranges }
+      ssh = { protocol = "tcp", ports = ["22"], source_ranges = local.ssh_ipv4_ranges }
     } : {},
     length(local.ssh_ipv6_ranges) > 0 ? {
-      ssh-ipv6 = { ports = ["22"], source_ranges = local.ssh_ipv6_ranges }
+      ssh-ipv6 = { protocol = "tcp", ports = ["22"], source_ranges = local.ssh_ipv6_ranges }
     } : {},
     var.allow_http_https ? {
-      http-https = { ports = ["80", "443"], source_ranges = ["0.0.0.0/0"] }
+      http-https = { protocol = "tcp", ports = ["80", "443"], source_ranges = ["0.0.0.0/0"] }
     } : {},
     var.allow_http_https && local.external_ipv6 ? {
-      http-https-ipv6 = { ports = ["80", "443"], source_ranges = ["::/0"] }
+      http-https-ipv6 = { protocol = "tcp", ports = ["80", "443"], source_ranges = ["::/0"] }
+    } : {},
+    var.allow_icmp ? {
+      icmp = { protocol = "icmp", ports = null, source_ranges = ["0.0.0.0/0"] }
+    } : {},
+    var.allow_icmp && local.external_ipv6 ? {
+      icmp-ipv6 = { protocol = "58", ports = null, source_ranges = ["::/0"] }
     } : {},
   )
 }
@@ -149,7 +156,7 @@ resource "google_compute_firewall" "this" {
   target_tags   = [local.network_tag]
 
   allow {
-    protocol = "tcp"
+    protocol = each.value.protocol
     ports    = each.value.ports
   }
 }
