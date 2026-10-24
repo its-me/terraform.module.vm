@@ -145,6 +145,44 @@ resource "google_compute_instance" "this" {
   }
 }
 
+# Scheduled snapshots of the boot disk. Attached as a separate resource rather than via
+# boot_disk.initialize_params.resource_policies, which would rebuild an existing VM.
+resource "google_compute_resource_policy" "snapshots" {
+  count = var.snapshot_schedule != null ? 1 : 0
+
+  name    = "${var.name}-snapshots"
+  project = var.project_id
+  region  = local.region
+
+  snapshot_schedule_policy {
+    schedule {
+      daily_schedule {
+        days_in_cycle = var.snapshot_schedule.days_in_cycle
+        start_time    = var.snapshot_schedule.start_time
+      }
+    }
+
+    retention_policy {
+      max_retention_days    = var.snapshot_schedule.retention_days
+      on_source_disk_delete = "KEEP_AUTO_SNAPSHOTS"
+    }
+
+    snapshot_properties {
+      storage_locations = var.snapshot_schedule.storage_locations
+      labels            = var.labels
+    }
+  }
+}
+
+resource "google_compute_disk_resource_policy_attachment" "snapshots" {
+  count = var.snapshot_schedule != null ? 1 : 0
+
+  name    = google_compute_resource_policy.snapshots[0].name
+  project = var.project_id
+  zone    = var.zone
+  disk    = reverse(split("/", google_compute_instance.this.boot_disk[0].source))[0]
+}
+
 resource "google_compute_firewall" "this" {
   for_each = local.firewall_rules
 

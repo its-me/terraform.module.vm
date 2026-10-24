@@ -100,6 +100,31 @@ variable "ssh_keys" {
   }
 }
 
+variable "snapshot_schedule" {
+  description = <<-EOT
+    Scheduled snapshots of the boot disk; null (the default) takes none.
+    - days_in_cycle (1): take a snapshot every N days.
+    - start_time ("03:00"): UTC hour the snapshot window starts, "HH:00".
+    - retention_days (7): delete snapshots older than this.
+    - storage_locations (null): where snapshots are stored, e.g. ["me-west1"];
+      null uses GCP's default, the multi-region nearest the disk.
+    Snapshots are kept when the disk is deleted, so a rebuilt or deleted VM can be
+    restored from them. Adding this to an existing instance doesn't recreate it.
+  EOT
+  type = object({
+    days_in_cycle     = optional(number, 1)
+    start_time        = optional(string, "03:00")
+    retention_days    = optional(number, 7)
+    storage_locations = optional(list(string))
+  })
+  default = null
+
+  validation {
+    condition     = var.snapshot_schedule == null || can(regex("^([01][0-9]|2[0-3]):00$", var.snapshot_schedule.start_time))
+    error_message = "snapshot_schedule.start_time must be a whole UTC hour in \"HH:00\" format, e.g. \"03:00\"."
+  }
+}
+
 variable "deletion_protection" {
   description = "Whether to block deletion of the instance."
   type        = bool
